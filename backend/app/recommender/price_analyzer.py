@@ -2,7 +2,7 @@ from typing import List, Dict, Tuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import statistics
-from .base_scraper import LegoSet
+from ..scraper.base_scraper import LegoSet
 
 
 @dataclass

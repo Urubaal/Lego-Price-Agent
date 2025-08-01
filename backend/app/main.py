@@ -9,6 +9,8 @@ from .scraper.olx_scraper import OlxScraper
 from .scraper.ceneo_scraper import CeneoScraper
 from .recommender.price_analyzer import PriceAnalyzer, PriceRecommendation
 from .scraper.base_scraper import LegoSet
+from .database.database import create_tables
+from .api import auth, watchlist
 
 app = FastAPI(
     title="LEGO Price Agent API",
@@ -30,6 +32,15 @@ allegro_scraper = AllegroScraper()
 olx_scraper = OlxScraper()
 ceneo_scraper = CeneoScraper()
 price_analyzer = PriceAnalyzer()
+
+# Include API routers
+app.include_router(auth.router)
+app.include_router(watchlist.router)
+
+# Create database tables on startup
+@app.on_event("startup")
+async def startup_event():
+    create_tables()
 
 
 @app.get("/")
