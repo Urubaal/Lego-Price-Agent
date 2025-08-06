@@ -3,11 +3,17 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 import os
 
-# Database URL from environment variable or default
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/lego_price_agent")
+# Database URL from environment variable or default to SQLite for development
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./lego_price_agent.db")
 
-# Create engine
-engine = create_engine(DATABASE_URL)
+# Create engine with SQLite specific settings
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        DATABASE_URL, 
+        connect_args={"check_same_thread": False}
+    )
+else:
+    engine = create_engine(DATABASE_URL)
 
 # Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -25,4 +31,6 @@ def get_db():
 
 # Create all tables
 def create_tables():
+    # Import models to ensure they are registered with Base
+    import app.database.models
     Base.metadata.create_all(bind=engine) 

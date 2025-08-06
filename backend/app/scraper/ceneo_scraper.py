@@ -17,71 +17,122 @@ class CeneoScraper(BaseScraper):
         """Search for LEGO sets on Ceneo"""
         sets = []
         
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            
-            # Search for LEGO sets on Ceneo
-            search_url = f"{self.base_url}/;szukaj-{query.replace(' ', '+')}"
-            await page.goto(search_url)
-            
-            # Wait for results to load
-            await page.wait_for_selector('.cat-prod-row', timeout=10000)
-            
-            # Extract product listings
-            listings = await page.query_selector_all('.cat-prod-row')
-            
-            for listing in listings[:10]:  # Limit to first 10 results
-                try:
-                    # Extract set information
-                    title_elem = await listing.query_selector('.cat-prod-row__name')
-                    price_elem = await listing.query_selector('.cat-prod-row__price')
-                    link_elem = await listing.query_selector('.cat-prod-row__name a')
-                    
-                    if not all([title_elem, price_elem, link_elem]):
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                page = await browser.new_page()
+                
+                # Set user agent to avoid detection
+                await page.set_extra_http_headers({
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                })
+                
+                # Search for LEGO sets on Ceneo
+                search_url = f"{self.base_url}/;szukaj-{query.replace(' ', '+')}"
+                await page.goto(search_url, wait_until='networkidle')
+                
+                # Try multiple selectors for results
+                selectors = [
+                    '.cat-prod-row',
+                    '.product-row',
+                    '.search-results',
+                    '.products-grid',
+                    '[data-role="search-results"]',
+                    '.listing-item'
+                ]
+                
+                listings = []
+                for selector in selectors:
+                    try:
+                        await page.wait_for_selector(selector, timeout=5000)
+                        listings = await page.query_selector_all(f'{selector}')
+                        if listings:
+                            break
+                    except:
                         continue
-                    
-                    title = await title_elem.text_content()
-                    price_text = await price_elem.text_content()
-                    link = await link_elem.get_attribute('href')
-                    
-                    # Parse set number from title
-                    set_number = self._extract_set_number(title)
-                    if not set_number:
+                
+                if not listings:
+                    # Fallback: try to find any product cards
+                    listings = await page.query_selector_all('[data-testid*="product"], .product-card, .listing-item, article, .cat-prod-row')
+                
+                print(f"Found {len(listings)} potential listings on Ceneo")
+                
+                for listing in listings[:10]:  # Limit to first 10 results
+                    try:
+                        # Try multiple selectors for title
+                        title_selectors = ['.cat-prod-row__name', '.product-name', '.title', '[data-testid="title"]', '.product-title', 'h2', 'h3']
+                        title_elem = None
+                        for selector in title_selectors:
+                            title_elem = await listing.query_selector(selector)
+                            if title_elem:
+                                break
+                        
+                        # Try multiple selectors for price
+                        price_selectors = ['.cat-prod-row__price', '.price', '.product-price', '.listing-price', '.offer-price']
+                        price_elem = None
+                        for selector in price_selectors:
+                            price_elem = await listing.query_selector(selector)
+                            if price_elem:
+                                break
+                        
+                        # Try multiple selectors for link
+                        link_selectors = ['.cat-prod-row__name a', 'a', '[data-testid="link"]', '.product-link']
+                        link_elem = None
+                        for selector in link_selectors:
+                            link_elem = await listing.query_selector(selector)
+                            if link_elem:
+                                break
+                        
+                        if not all([title_elem, price_elem, link_elem]):
+                            continue
+                        
+                        title = await title_elem.text_content()
+                        price_text = await price_elem.text_content()
+                        link = await link_elem.get_attribute('href')
+                        
+                        if not title or not price_text:
+                            continue
+                        
+                        # Parse set number from title
+                        set_number = self._extract_set_number(title)
+                        if not set_number:
+                            continue
+                        
+                        # Parse price
+                        price = self._parse_price(price_text)
+                        if not price:
+                            continue
+                        
+                        # Calculate shipping (Ceneo shows prices from various stores)
+                        shipping = await self.get_shipping_cost(price)
+                        total_price = self.calculate_total_price(price, shipping)
+                        
+                        # Determine if new or used (Ceneo mostly has new items)
+                        condition = "new"
+                        
+                        lego_set = LegoSet(
+                            set_number=set_number,
+                            name=title.strip(),
+                            price=price,
+                            shipping_cost=shipping,
+                            total_price=total_price,
+                            store_name=self.store_name,
+                            store_url=f"{self.base_url}{link}" if link.startswith('/') else link,
+                            condition=condition,
+                            availability=True,
+                            last_updated=datetime.now()
+                        )
+                        
+                        sets.append(lego_set)
+                        
+                    except Exception as e:
+                        print(f"Error parsing Ceneo listing: {e}")
                         continue
-                    
-                    # Parse price
-                    price = self._parse_price(price_text)
-                    if not price:
-                        continue
-                    
-                    # Calculate shipping (Ceneo shows prices from various stores)
-                    shipping = await self.get_shipping_cost(price)
-                    total_price = self.calculate_total_price(price, shipping)
-                    
-                    # Determine if new or used (Ceneo mostly has new items)
-                    condition = "new"
-                    
-                    lego_set = LegoSet(
-                        set_number=set_number,
-                        name=title.strip(),
-                        price=price,
-                        shipping_cost=shipping,
-                        total_price=total_price,
-                        store_name=self.store_name,
-                        store_url=f"{self.base_url}{link}",
-                        condition=condition,
-                        availability=True,
-                        last_updated=datetime.now()
-                    )
-                    
-                    sets.append(lego_set)
-                    
-                except Exception as e:
-                    print(f"Error parsing Ceneo listing: {e}")
-                    continue
-            
-            await browser.close()
+                
+                await browser.close()
+        
+        except Exception as e:
+            print(f"Error in Ceneo scraper: {e}")
         
         return sets
     
