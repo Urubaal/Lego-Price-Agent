@@ -1,4 +1,4 @@
-import React from 'react';
+// React import not needed in modern React with JSX transform
 import { render, screen, act, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { AuthProvider, useAuth } from '../AuthContext';

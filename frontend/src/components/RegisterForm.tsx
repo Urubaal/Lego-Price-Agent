@@ -55,7 +55,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onRegister, onSwitchToLogin
       });
 
       if (response.ok) {
-        const data = await response.json();
+        await response.json(); // Registration successful
         // After successful registration, automatically log in
         const loginResponse = await fetch('http://localhost:8000/auth/login', {
           method: 'POST',
