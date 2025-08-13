@@ -63,6 +63,43 @@ class TestAPI:
         data = response.json()
         assert len(data["sets"]) <= 3
     
+    def test_search_endpoint_specific_set_number(self):
+        """Test search endpoint with specific set number - should filter for exact matches"""
+        response = client.get("/api/search?query=42100&limit=10")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "query" in data
+        assert "total_results" in data
+        assert "sets" in data
+        
+        assert data["query"] == "42100"
+        assert isinstance(data["total_results"], int)
+        assert isinstance(data["sets"], list)
+        
+        # All returned sets should have the exact set number 42100
+        for lego_set in data["sets"]:
+            assert lego_set["set_number"] == "42100"
+    
+    def test_search_endpoint_general_query(self):
+        """Test search endpoint with general query - should not filter for specific set"""
+        response = client.get("/api/search?query=lego technic&limit=10")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "query" in data
+        assert "total_results" in data
+        assert "sets" in data
+        
+        assert data["query"] == "lego technic"
+        assert isinstance(data["total_results"], int)
+        assert isinstance(data["sets"], list)
+        
+        # Should return various set numbers, not just one specific
+        set_numbers = [lego_set["set_number"] for lego_set in data["sets"]]
+        # At least some sets should be returned (mock data includes multiple sets)
+        assert len(set_numbers) > 0
+    
     def test_set_details_endpoint(self):
         """Test set details endpoint"""
         response = client.get("/api/set/42100")

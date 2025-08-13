@@ -9,31 +9,27 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/lego_price_agent
       - REDIS_URL=redis://redis:6379
-      - FRONTEND_URL=http://localhost:3000
+      - FRONTEND_URL=http://localhost
     depends_on:
       - db
       - redis
-    volumes:
-      - ./backend:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     networks:
       - lego-network
+    restart: unless-stopped
 
-  # Frontend
+  # Frontend (Production)
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
     ports:
-      - "3000:3000"
-    environment:
-      - VITE_API_URL=http://localhost:8000
+      - "80:80"
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: npm run dev
     networks:
       - lego-network
+    restart: unless-stopped
 
   # PostgreSQL Database
   db:
@@ -42,22 +38,20 @@ services:
       - POSTGRES_DB=lego_price_agent
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - lego-network
+    restart: unless-stopped
 
   # Redis for caching and task queue
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
       - lego-network
+    restart: unless-stopped
 
   # Celery worker for background tasks
   celery:
@@ -69,10 +63,9 @@ services:
     depends_on:
       - db
       - redis
-    volumes:
-      - ./backend:/app
     networks:
       - lego-network
+    restart: unless-stopped
 
 networks:
   lego-network:
