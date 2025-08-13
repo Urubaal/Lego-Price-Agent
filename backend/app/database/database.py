@@ -1,6 +1,5 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base
 import os
 
 # Database URL from environment variable or default to SQLite for development

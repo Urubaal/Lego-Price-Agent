@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .database import Base
 
@@ -16,8 +16,8 @@ class LegoSet(Base):
     minifigures = Column(Integer)
     age_range = Column(String(20))
     price_msrp = Column(Float)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     prices = relationship("PriceHistory", back_populates="lego_set")
@@ -36,7 +36,7 @@ class PriceHistory(Base):
     condition = Column(String(50), default="new")  # new, used, damaged
     availability = Column(Boolean, default=True)
     currency = Column(String(3), default="PLN")
-    scraped_at = Column(DateTime, default=datetime.utcnow)
+    scraped_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
     lego_set = relationship("LegoSet", back_populates="prices")
@@ -53,7 +53,7 @@ class PriceRecommendation(Base):
     recommendation = Column(String(20), nullable=False)  # buy, wait, avoid
     confidence_score = Column(Float, nullable=False)
     reasoning = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
     lego_set = relationship("LegoSet", back_populates="recommendations")
@@ -66,7 +66,7 @@ class User(Base):
     username = Column(String(100), unique=True, index=True)
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
     watchlist = relationship("WatchlistItem", back_populates="user")
@@ -79,7 +79,7 @@ class WatchlistItem(Base):
     lego_set_id = Column(Integer, ForeignKey("lego_sets.id"), nullable=False)
     target_price = Column(Float)
     notification_enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
     user = relationship("User", back_populates="watchlist") 

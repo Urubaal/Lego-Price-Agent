@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
@@ -21,7 +22,7 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_origins=[os.getenv("FRONTEND_URL", "http://localhost:3000")],  # Frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,6 +43,16 @@ app.include_router(watchlist.router)
 async def startup_event():
     create_tables()
 
+# Alternative using lifespan (for future FastAPI versions)
+# from contextlib import asynccontextmanager
+# 
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     create_tables()
+#     yield
+# 
+# app = FastAPI(lifespan=lifespan)
+
 
 @app.get("/")
 async def root():
@@ -57,6 +68,11 @@ async def root():
 async def search_lego_sets(query: str, limit: int = 10):
     """Search for LEGO sets across all stores"""
     try:
+        # Check if query looks like a specific set number (3-5 digits)
+        import re
+        set_number_pattern = re.compile(r'^\d{3,5}$')
+        is_specific_set = set_number_pattern.match(query.strip())
+        
         # Search on multiple platforms
         allegro_results = await allegro_scraper.search_sets(query)
         olx_results = await olx_scraper.search_sets(query)
@@ -64,6 +80,17 @@ async def search_lego_sets(query: str, limit: int = 10):
         
         # Combine results from all platforms
         all_results = allegro_results + olx_results + ceneo_results
+        
+        # If query is a specific set number, filter for exact matches
+        if is_specific_set:
+            target_set_number = query.strip()
+            filtered_results = []
+            for result in all_results:
+                if result.set_number == target_set_number:
+                    filtered_results.append(result)
+            all_results = filtered_results
+            print(f"Filtered results for set {target_set_number}: {len(all_results)} exact matches")
+        
         all_results = all_results[:limit]  # Limit total results
         
         # Analyze prices and get recommendations

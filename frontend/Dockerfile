@@ -9,12 +9,8 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
-
-# Install serve to run the built app
-RUN npm install -g serve
-
+# Expose port
 EXPOSE 3000
 
-CMD ["serve", "-s", "dist", "-l", "3000"] 
+# Default command for development (can be overridden in docker-compose)
+CMD ["npm", "run", "dev"] 
